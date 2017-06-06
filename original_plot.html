@@ -1,0 +1,235 @@
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>PiWeather</title>
+    <style>
+     .demo-placeholder
+     {
+	    width: 35%;
+	    height: 30%;
+     }
+     h2
+     {
+      font-size:		24px;
+      font-weight:	bold;
+      font-family:	arial;
+      font-style:       normal;
+      text-align:		left;
+      color:			#28008E;
+      background:		#E7E7E7;
+     }
+     .titleStyle {
+      font-size:		32px;
+      font-weight:	bold;
+      font-family:	arial;
+      font-style:       normal;
+      text-align:		left;
+      color:			#28008E;
+      background:		#E7E7E7;
+      }
+
+
+    </style>
+	<script language="javascript" type="text/javascript"
+       src="jquery.js"></script>
+	<script language="javascript" type="text/javascript"
+       src="jquery.flot.js"></script>
+    <script language="javascript" type="text/javascript"
+       src="jquery.flot.time.js"></script>
+    <script language="javascript" type="text/javascript">
+
+    var PrevRawMeasurement = 0.0;
+    var NewRawMeasurement = 0.0;
+    var DerivedMeasurement = 0.0;
+    var UserDefinedOffset = 0.0;
+    var UserDefinedScalar = 1.0;
+
+    function UpdateOffset()
+    {
+        UserDefinedOffset = document.getElementById("OffsetVal").value;
+        document.getElementById("demo").innerHTML = "Offset was updated to " + UserDefinedOffset;
+    }
+
+    function UpdateScalar()
+    {
+        UserDefinedScalar = document.getElementById("ScalarVal").value;
+        document.getElementById("demo").innerHTML = "Scalar was updated to " + UserDefinedScalar;
+    }
+
+    function CalculateRawMeasurement(raw)
+    {
+        if((abs(PrevRawMeasurement - raw)) < 5)
+        {
+            PrevRawMeasurement = NewRawMeasurement
+            NewRawMeasurement = raw
+        }
+        else
+        {
+            PrevRawMeasurement = raw
+        }
+
+        DerivedMeasurement = (parseFloat(raw) * parseFloat(UserDefinedScalar)) + parseFloat(UserDefinedOffset);
+    }
+
+    function CalculateDerivedMeasurement(raw)
+    {
+        DerivedMeasurement = (parseFloat(raw) * parseFloat(UserDefinedScalar)) + parseFloat(UserDefinedOffset);
+    }
+
+
+    $(document).ready(function() {
+    // plot options
+    var options = {
+        series: {
+		  lines: {
+			show: true
+		  },
+		  points: {
+			show: false
+		  }
+		},
+        grid: {
+		  clickable: true
+		},
+	    yaxes: [{min: 15, max: 25}],
+        xaxes: [{min: 0, max: 100}],
+        xaxis: {
+            mode: "time",
+            timeformat: "%H:%M:%S"
+            }
+    };
+
+    // create empty plot
+	var plot = $.plot("#placeholder", [[]], options);
+    // initialize data arrays
+    var RH = [];
+    var T = [];
+    var timeStamp = [];
+    // get data from server
+    function getData() {
+        // AJAX callback
+        function onDataReceived(jsonData) {
+            timeStamp.push(Date());
+            // add RH data
+			RH.push(jsonData.RH);
+            // removed oldest
+            if (RH.length > 100) {
+              RH.splice(0, 1);
+            }
+            // add T data
+
+            var temperature = innerHTML=jsonData.T
+            var timestamp = new Date(Date.now())
+
+            CalculateDerivedMeasurement(jsonData.T)
+
+            document.getElementById("CurrentValue").innerHTML= "Raw Measurement:          " + jsonData.T
+            document.getElementById("DerivedValue").innerHTML= "Derived Measurement:          " + DerivedMeasurement
+            document.getElementById("CurrentTime").innerHTML=timestamp.toUTCString()
+
+            T.push(jsonData.T);
+            // removed oldest
+            if (T.length > 100) {
+              T.splice(0, 1);
+            }
+            s1 = [];
+            s2 = [];
+            for (var i = 0; i < RH.length; i++) {
+                s1.push([i, RH[i]]);
+                s2.push([i, T[i]]);
+            }
+            // set to plot
+            plot.setData([s1, s2]);
+            plot.draw();
+		}
+        // AJAX error handler
+        function onError(){
+            $('#ajax-panel').html('<p><strong>Ajax error!</strong> </p>');
+        }
+
+        // make the AJAX call
+		$.ajax({
+		    url: "getdata",
+			type: "GET",
+			dataType: "json",
+			success: onDataReceived,
+            error: onError
+		});
+     }
+
+     // define an update function
+	 function update() {
+        // get data
+        getData();
+        // set timeout
+		setTimeout(update, 5000);
+	 }
+     // call update
+	 update();
+
+
+
+     $("#placeholder").bind("plotclick", function (event, pos, item) {
+          if (item) {
+            plot.highlight(item.series, item.datapoint);
+            var strData = ' [Clicked Data: ' +
+                           timeStamp[item.dataIndex] + ': T = ' +
+                           T[item.dataIndex] + ', RH = ' + RH[item.dataIndex]
+                          + ']';
+            $('#data-values').html(strData);
+          }
+     });
+
+});
+
+
+
+
+</script>
+</head>
+<body  bgcolor="#E7E7E7">
+
+    <img align = 'centre' src='static/logo.png'>
+    <h1 class="titleStyle">Sensor Remote Access</h1>
+	<div id="header">
+		<h2>3300 Serial Output Demo</h2>
+	</div>
+
+
+    <div>
+        Offset: <input type="number" id="OffsetVal" value="0.00"><button onclick="UpdateOffset()">Update Offset</button>
+        <br>
+        Scalar: <input type="number" id="ScalarVal" value="1.00"><button onclick="UpdateScalar()">Update Scalar</button>
+        <br>
+    </div>
+
+
+	<div id="content">
+		<div class="demo-container">
+			<div id="placeholder" class="demo-placeholder"></div>
+		</div>
+        <div id="ajax-panel"> </div>
+	</div>
+
+
+    <div >
+        <h2 id="CurrentValue">No VOC Data</h2>
+    </div>
+    <div >
+      <h2 id="DerivedValue">No VOC Data</h2>
+    </div>
+    <div  >
+      <h2 id="CurrentTime">No Time Data</h2>
+    </div>
+
+    <div>
+        <p id="demo">text here</p>
+    </div>
+    <br><br>
+    <form action="/sendStuffToBottle" method="post">
+        Username: <input name="username" type="text" />
+        Password: <input name="password" type="text" />
+        <input value="Send Stuff To Bottle" type="submit" target="blank"/>
+    </form>
+</body>
+</html>

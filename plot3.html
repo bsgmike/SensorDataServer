@@ -1,0 +1,365 @@
+<html lang="en">
+    <head>
+        <!--<meta http-equiv="Content-Type" content="text/html; charset=utf-8">-->
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- Bootstrap -->
+        <link href="bootstrapcss/bootstrap.min.css" rel="stylesheet">
+
+        <title>Paramag Wireless Access Demo - plot 3</title>
+        <style>
+
+            .bg-1
+            {
+                background-color: #E7E7E7; /* Green */
+                color: #ffffff;
+            }
+
+           .bg-2
+            {
+                background-color: #FFFFCF; /* Green */
+                color: #ffffff;
+            }
+             .demo-placeholder
+             {
+                width: 100%;
+                height: 30%;
+             }
+             h2
+             {
+              font-size:		24px;
+              font-weight:	bold;
+              font-family:	arial;
+              font-style:       normal;
+              text-align:		left;
+              color:			#28008E;
+              background:		#E7E7E7;
+             }
+             .titleStyle {
+              font-size:		32px;
+              font-weight:	bold;
+              font-family:	arial;
+              font-style:       normal;
+              text-align:		left;
+              color:			#28008E;
+              background:		#E7E7E7;
+              }
+
+              td
+              {
+                  font-size:	18px;
+                  font-weight:	bold;
+                  font-family:	arial;
+                  color:	    #28008E;
+              }
+              .mytable
+              {
+                border-style: solid;
+                border-color: black;
+              }
+
+              .mytable th
+              {
+                  font-size:	18px;
+                  font-weight:	bold;
+                  font-family:	arial;
+                  color:	    #FF2233;
+              }
+        </style>
+
+        <script language="javascript" type="text/javascript"
+           src="flot/jquery.js"></script>
+
+        <script language="javascript" type="text/javascript"
+           src="flot/jquery.flot.js"></script>
+
+        <script language="javascript" type="text/javascript"
+           src="flot/jquery.flot.time.js"></script>
+
+
+        <script language="javascript" type="text/javascript">
+            var PrevRawMeasurement = 0.0;
+            var NewRawMeasurement = 0.0;
+            var DerivedMeasurement = 0.0;
+            var UserDefinedOffset = 0.0;
+            var UserDefinedScalar = 1.0;
+
+            function UpdateOffset()
+            {
+                UserDefinedOffset = document.getElementById("newOffsetVal").value;
+                document.getElementById("demo").innerHTML = "Offset was updated to " + UserDefinedOffset;
+            }
+
+            function UpdateScalar()
+            {
+                UserDefinedScalar = document.getElementById("newScalarVal").value;
+                document.getElementById("demo").innerHTML = "Scalar was updated to " + UserDefinedScalar;
+                pr
+            }
+
+            function CalculateRawMeasurement(raw)
+            {
+                if((abs(PrevRawMeasurement - raw)) < 5)
+                {
+                    PrevRawMeasurement = NewRawMeasurement
+                    NewRawMeasurement = raw
+                }
+                else
+                {
+                    PrevRawMeasurement = raw
+                }
+
+                DerivedMeasurement = (parseFloat(raw) * parseFloat(UserDefinedScalar)) + parseFloat(UserDefinedOffset);
+            }
+
+            function CalculateDerivedMeasurement(raw)
+            {
+                DerivedMeasurement = (parseFloat(raw) * parseFloat(UserDefinedScalar)) + parseFloat(UserDefinedOffset);
+            }
+
+
+            $(document).ready(function()
+            {
+                // plot options
+                var options =
+                {
+                    series:
+                    {
+                        lines:
+                        {
+                            show: true
+                        },
+                        points:
+                        {
+                            show: false
+                        }
+                    },
+                    grid:
+                    {
+                      clickable: true
+                    },
+                    yaxes: [{min: 20, max: 24}],
+                    xaxes: [{min: 0, max: 100}],
+                    xaxis:
+                    {
+                        mode: "time",
+                        timeformat: "%H:%M:%S"
+                    }
+                };
+
+                // create empty plot
+                var plot = $.plot("#placeholder", [[]], options);
+                // initialize data arrays
+                var RH = [];
+                var T = [];
+                var timeStamp = [];
+                // get data from server
+                function getData()
+                {
+                    // AJAX callback
+                    function onDataReceived(jsonData)
+                    {
+                        timeStamp.push(Date());
+                        // add RH data
+                        RH.push(jsonData.RH);
+                        // removed oldest
+                        if (RH.length > 100)
+                        {
+                          RH.splice(0, 1);
+                        }
+                        // add T data
+
+                        var temperature = innerHTML=jsonData.T
+                        var timestamp = new Date(Date.now())
+
+                        CalculateDerivedMeasurement(jsonData.T)
+
+                        document.getElementById("CurrentValue").innerHTML= "Raw Measurement:          " + jsonData.T
+                        document.getElementById("DerivedValue").innerHTML= "Derived Measurement:          " + DerivedMeasurement
+                        document.getElementById("CurrentTime").innerHTML=timestamp.toUTCString()
+
+                        T.push(jsonData.T);
+                        // removed oldest
+                        if (T.length > 100)
+                        {
+                            T.splice(0, 1);
+                        }
+                        s1 = [];
+                        s2 = [];
+                        for (var i = 0; i < RH.length; i++)
+                        {
+                            s1.push([i, RH[i]]);
+                            s2.push([i, T[i]]);
+                        }
+                        // set to plot
+                        plot.setData([s1, s2]);
+                        plot.draw();
+                    }
+                    // AJAX error handler
+                    function onError()
+                    {
+                        $('#ajax-panel').html('<p><strong>Ajax error!</strong> </p>');
+                    }
+
+                    // make the AJAX call
+                    $.ajax(
+                    {
+                        url: "getdata",
+                        type: "GET",
+                        dataType: "json",
+                        success: onDataReceived,
+                        error: onError
+                    });
+                }
+
+                // define an update function
+                function update()
+                {
+                    // get data
+                    getData();
+                    // set timeout
+                    setTimeout(update, 2000);
+                }
+                // call update
+                update();
+
+                $("#placeholder").bind("plotclick", function (event, pos, item)
+                {
+                    if (item)
+                    {
+                        plot.highlight(item.series, item.datapoint);
+                        var strData = ' [Clicked Data: ' +
+                                       timeStamp[item.dataIndex] + ': T = ' +
+                                       T[item.dataIndex] + ', RH = ' + RH[item.dataIndex]
+                                      + ']';
+                        $('#data-values').html(strData);
+                    }
+                });
+
+            });
+
+        </script>
+    </head>
+
+    <body  bgcolor="#E7E7E7">
+
+    <div class="container bg-1 text-center">
+        <div class="row">
+            <div class="col-sm-3">
+                <img align = 'centre' src='static/logo.png'>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-4">
+                <h1 class="titleStyle" align='centre'>Paramag Wireless Access Demo</h1>
+            </div>
+        </div>
+
+
+        <div class="row">
+            <div class="col-sm-2">
+                <form>
+                  <div class="input-group">
+                    <span class="input-group-addon">Offset</span>
+                    <input id="newOffsetVal" type="number" class="form-control" name="newOffsetVal" placeholder="0.0">
+                  </div>
+                </form>
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-primary" onclick="UpdateOffset()">Update Offset</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-2">
+                <form>
+                  <div class="input-group">
+                    <span class="input-group-addon">Scalar</span>
+                    <input id="newScalarVal" type="number" class="form-control" name="newScalarVal" placeholder="1.0">
+                  </div>
+                </form>
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-primary" onclick="UpdateScalar()">Update Scalar</button>
+            </div>
+        </div>
+
+
+
+        <div id="content" class="row">
+            <div class="col-sm-8">
+                <div class="demo-container bg-2">
+                    <div id="placeholder" class="demo-placeholder"></div>
+                </div>
+                <div id="ajax-panel"> </div>
+            </div>
+        </div>
+
+
+        <div class="row">
+            <div class="col-sm-4">
+                <h2 id="CurrentValue">No VOC Data</h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-4">
+                <h2 id="DerivedValue">No VOC Data</h2>
+            </div>
+        </div>
+
+
+        <div class="row">
+            <div class="col-sm-4">
+                <h2 id="CurrentTime">No Time Data</h2>
+            </div>
+        </div>
+
+
+
+        <div>
+            <p id="demo">text here</p>
+        </div>
+
+        <div class="container col-sm-8">
+            <table class="table  mytable">
+                <colgroup>
+                    <col class="col-md-5">
+                    <col class="col-md-3">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Masurement</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Raw O2 Conc</td>
+                        <td><span id="basicMeasurement" class="label label-info">Time Stamp</span></td>
+                    </tr>
+                    <tr>
+                        <td>Derived O2 Conc</td>
+                        <td><span id="derivedMeasurement" class="label label-info">Time Stamp</span></td>
+                    </tr>
+                    <tr>
+                        <td>Time Stamp</td>
+                        <td>now</td>
+                    </tr>
+                    <tr>
+                        <td>Time Stamp</td>
+                        <td><span id="timeStamp" class="label label-info">Time Stamp</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="panel panel-default">
+                                <div class="panel-body">A Basic Panel</div>
+                            </div>
+                        </td>
+                        <td><span id="timeStamp2" class="label label-info">Time Stamp</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    </body>
+</html>
